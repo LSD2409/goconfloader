@@ -28,8 +28,8 @@
  
  // struct with config fields
  type struct Config {
-    ENV_VAR1 string
-    ENV_VAR2 string
+    EnvVar1 string `ConfLoader:"ENV_VAR1"`  // Alias
+    EnvVar2 string `ConfLoader: "ENV_VAR2"` // Alias
  }
 
  // variable where you want to store config
@@ -42,8 +42,8 @@
         panic(err.Error())
     }
 
-    fmt.Println(AppConfig.ENV_VAR1)
-    fmt.Println(AppConfig.ENV_VAR2)
+    fmt.Println(AppConfig.EnvVar1)
+    fmt.Println(AppConfig.EnvVar2)
  }
  ```
 
@@ -66,8 +66,8 @@ package main
  
  // add default values with ConfLoader tag
  type struct Config {
-    ENV_VAR1 string `ConfLoader:"defaultValue"`
-    ENV_VAR2 string `ConfLoader:"oneMoreDefaultValue"`
+    EnvVar1 string `ConfLoader:"ENV_VAR1,defaultValue"` // alias and default value
+    EnvVar2 string `ConfLoader:"ENV_VAR2,oneMoreDefaultValue"` // alias and default value
  }
 
  var AppConfig Config
@@ -78,8 +78,8 @@ package main
         panic(err.Error())
     }
 
-    fmt.Println(AppConfig.ENV_VAR1)
-    fmt.Println(AppConfig.ENV_VAR2)
+    fmt.Println(AppConfig.EnvVar1)
+    fmt.Println(AppConfig.EnvVar2)
  }
  ```
  ```shell
@@ -101,8 +101,8 @@ import (
 type T string
 
 type Config struct {
-	ENV_VAR1 T
-	ENV_VAR2 T
+	EnvVar1 T `ConfLoader:"ENV_VAR1"`
+	EnvVar2 T `ConfLoader:"ENV_VAR2"`
 }
 
 var AppConfig Config
@@ -113,7 +113,7 @@ func main() {
 		panic(err.Error())
 	}
 
-	fmt.Println(AppConfig.ENV_VAR1)
-	fmt.Println(AppConfig.ENV_VAR2)
+	fmt.Println(AppConfig.EnvVar1)
+	fmt.Println(AppConfig.EnvVar2)
 }
  ```
