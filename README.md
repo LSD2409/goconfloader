@@ -4,7 +4,7 @@
 
  Now supports Int, String, Uint, Float and any of types which have those types as underlying types.
 
- Bool, Slices, Map, Struct will be added in future.
+ Bool, Slices, Map, Struct and !!!TESTS!!! will be added in future.
 
  ## Installation
  ```shell
@@ -108,7 +108,7 @@ type Config struct {
 var AppConfig Config
 
 func main() {
-	err := goconfloader.LoadConfig(&AppConfig, "./.env")
+	err := goconfloader.LoadConfig(&AppConfig, "pathToEnv")
 	if err != nil {
 		panic(err.Error())
 	}
