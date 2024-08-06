@@ -19,33 +19,25 @@ type ConfigParser interface {
 }
 
 type confTag struct {
+	alias        string
 	defaultValue string
-	omitEmpty    bool
 }
 
-func (tag confTag) getDefaultValue() (string, bool) {
-	if len(tag.defaultValue) > 0 {
-		return tag.defaultValue, true
-	}
-
-	return "", false
-}
-
-func parseTag(tag reflect.StructTag) (confTag, error) {
+func getTag(tag reflect.StructTag) (confTag, bool) {
 	val, exists := tag.Lookup(structTag)
 	if !exists {
-		return confTag{}, fmt.Errorf("no tag")
+		return confTag{}, false
 	}
 
 	tags := strings.Split(val, ",")
 
 	switch len(tags) {
 	case 0:
-		return confTag{}, nil
+		return confTag{}, true
 	case 1:
-		return confTag{defaultValue: tags[0], omitEmpty: false}, nil
+		return confTag{alias: tags[0], defaultValue: ""}, true
 	default:
-		return confTag{defaultValue: tags[0], omitEmpty: tags[1] == "omitempty"}, nil
+		return confTag{alias: tags[0], defaultValue: tags[1]}, true
 	}
 }
 
@@ -66,32 +58,38 @@ func GetParser(val *reflect.Value) ConfigParser {
 
 type intParser struct{}
 
-func (p intParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
-	value, exists := os.LookupEnv(typ.Name)
-	if exists {
-		if typedVal, err := strconv.ParseInt(value, 10, 64); err != nil {
-			return fmt.Errorf(typeMismatchError, typ.Name, err)
-		} else {
-			val.SetInt(typedVal)
-		}
+func getValue(typ *reflect.StructField) (string, error) {
+	var envName string
 
+	tag, tagExists := getTag(typ.Tag)
+	if tagExists && tag.alias != "" {
+		envName = tag.alias
 	} else {
-		tag, err := parseTag(typ.Tag)
-		if err != nil {
-			return fmt.Errorf(noValueForFieldError, typ.Name)
-		}
+		envName = typ.Name
+	}
 
-		value, exists := tag.getDefaultValue()
-		if exists {
-			if typedVal, err := strconv.ParseInt(value, 10, 64); err == nil {
-				val.SetInt(typedVal)
-			} else {
-				return fmt.Errorf(typeMismatchError, typ.Name, err)
-			}
-
-		} else if !exists && !tag.omitEmpty {
-			return fmt.Errorf(noValueForFieldError, typ.Name)
+	if value, exists := os.LookupEnv(envName); exists {
+		return value, nil
+	} else {
+		if tagExists && len(tag.defaultValue) > 0 {
+			return tag.defaultValue, nil
+		} else {
+			return "", fmt.Errorf(noValueForFieldError, envName)
 		}
+	}
+}
+
+func (p intParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
+	value, err := getValue(typ)
+	if err != nil {
+		return err
+	}
+
+	typedVal, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return fmt.Errorf(typeMismatchError, typ.Name, err)
+	} else {
+		val.SetInt(typedVal)
 	}
 
 	return nil
@@ -100,24 +98,12 @@ func (p intParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
 type stringParser struct{}
 
 func (p stringParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
-	value, exists := os.LookupEnv(typ.Name)
-	if exists {
-		val.SetString(value)
-
-	} else {
-		tag, err := parseTag(typ.Tag)
-		if err != nil {
-			return fmt.Errorf(noValueForFieldError, typ.Name)
-		}
-
-		value, exists := tag.getDefaultValue()
-		if exists {
-			val.SetString(value)
-
-		} else if !exists && !tag.omitEmpty {
-			return fmt.Errorf("no value for %s config field", typ.Name)
-		}
+	value, err := getValue(typ)
+	if err != nil {
+		return err
 	}
+
+	val.SetString(value)
 
 	return nil
 }
@@ -125,31 +111,17 @@ func (p stringParser) Parse(val *reflect.Value, typ *reflect.StructField) error 
 type uintParser struct{}
 
 func (p uintParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
-	value, exist := os.LookupEnv(typ.Name)
-	if exist {
-		if typedVal, err := strconv.ParseUint(value, 10, 64); err != nil {
-			return fmt.Errorf(typeMismatchError, typ.Name, err)
-		} else {
-			val.SetUint(typedVal)
-		}
-
-	} else {
-		tag, err := parseTag(typ.Tag)
-		if err != nil {
-			return fmt.Errorf(noValueForFieldError, typ.Name)
-		}
-
-		value, exists := tag.getDefaultValue()
-		if exists {
-			if typedVal, err := strconv.ParseUint(value, 10, 64); err != nil {
-				return fmt.Errorf(typeMismatchError, typ.Name, err)
-			} else {
-				val.SetUint(typedVal)
-			}
-		} else if !exists && !tag.omitEmpty {
-			return fmt.Errorf("no value for %s config field", typ.Name)
-		}
+	value, err := getValue(typ)
+	if err != nil {
+		return err
 	}
+
+	typedVal, err := strconv.ParseUint(value, 10, 64)
+	if err != nil {
+		return fmt.Errorf(typeMismatchError, typ.Name, err)
+	}
+
+	val.SetUint(typedVal)
 
 	return nil
 }
@@ -157,31 +129,16 @@ func (p uintParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
 type floatParser struct{}
 
 func (p floatParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
-	value, exists := os.LookupEnv(typ.Name)
-	if exists {
-		if typedVal, err := strconv.ParseFloat(value, 64); err != nil {
-			return fmt.Errorf(typeMismatchError, typ.Name, err)
-		} else {
-			val.SetFloat(typedVal)
-		}
-	} else {
-		tag, err := parseTag(typ.Tag)
-		if err != nil {
-			return fmt.Errorf(noValueForFieldError, typ.Name)
-		}
-
-		value, exists := tag.getDefaultValue()
-		if exists {
-			if typedVal, err := strconv.ParseFloat(value, 64); err != nil {
-				return fmt.Errorf(typeMismatchError, typ.Name, err)
-			} else {
-				val.SetFloat(typedVal)
-			}
-
-		} else if !exists && !tag.omitEmpty {
-			return fmt.Errorf(noValueForFieldError, typ.Name)
-		}
+	value, err := getValue(typ)
+	if err != nil {
+		return err
 	}
 
+	typedVal, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return fmt.Errorf(typeMismatchError, typ.Name, err)
+	}
+
+	val.SetFloat(typedVal)
 	return nil
 }
