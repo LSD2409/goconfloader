@@ -34,9 +34,9 @@ func LoadConfig(config interface{}, envPath ...string) error {
 		structVal := val.Field(i)
 		structTyp := typ.Field(i)
 
-		parser := GetParser(&structVal)
+		parser := getParser(&structVal)
 
-		err := parser.Parse(&structVal, &structTyp)
+		err := parser.parse(&structVal, &structTyp)
 		if err != nil && configPolicy == ErrorNoValue {
 			return err
 		}

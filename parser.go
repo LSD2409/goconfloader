@@ -15,7 +15,7 @@ const (
 )
 
 type ConfigParser interface {
-	Parse(val *reflect.Value, typ *reflect.StructField) error
+	parse(val *reflect.Value, typ *reflect.StructField) error
 }
 
 type confTag struct {
@@ -41,7 +41,7 @@ func getTag(tag reflect.StructTag) (confTag, bool) {
 	}
 }
 
-func GetParser(val *reflect.Value) ConfigParser {
+func getParser(val *reflect.Value) ConfigParser {
 	switch kind := val.Kind(); kind {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return intParser{}
@@ -51,6 +51,8 @@ func GetParser(val *reflect.Value) ConfigParser {
 		return floatParser{}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return uintParser{}
+	case reflect.Bool:
+		return boolParser{}
 	default:
 		return stringParser{}
 	}
@@ -79,7 +81,7 @@ func getValue(typ *reflect.StructField) (string, error) {
 	}
 }
 
-func (p intParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
+func (p intParser) parse(val *reflect.Value, typ *reflect.StructField) error {
 	value, err := getValue(typ)
 	if err != nil {
 		return err
@@ -97,7 +99,7 @@ func (p intParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
 
 type stringParser struct{}
 
-func (p stringParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
+func (p stringParser) parse(val *reflect.Value, typ *reflect.StructField) error {
 	value, err := getValue(typ)
 	if err != nil {
 		return err
@@ -110,7 +112,7 @@ func (p stringParser) Parse(val *reflect.Value, typ *reflect.StructField) error 
 
 type uintParser struct{}
 
-func (p uintParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
+func (p uintParser) parse(val *reflect.Value, typ *reflect.StructField) error {
 	value, err := getValue(typ)
 	if err != nil {
 		return err
@@ -128,7 +130,7 @@ func (p uintParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
 
 type floatParser struct{}
 
-func (p floatParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
+func (p floatParser) parse(val *reflect.Value, typ *reflect.StructField) error {
 	value, err := getValue(typ)
 	if err != nil {
 		return err
@@ -140,5 +142,22 @@ func (p floatParser) Parse(val *reflect.Value, typ *reflect.StructField) error {
 	}
 
 	val.SetFloat(typedVal)
+	return nil
+}
+
+type boolParser struct{}
+
+func (p boolParser) parse(val *reflect.Value, typ *reflect.StructField) error {
+	value, err := getValue(typ)
+	if err != nil {
+		return err
+	}
+
+	typedVal, err := strconv.ParseBool(value)
+	if err != nil {
+		return fmt.Errorf(typeMismatchError, typ.Name, err)
+	}
+
+	val.SetBool(typedVal)
 	return nil
 }
