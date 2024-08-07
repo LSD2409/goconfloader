@@ -41,25 +41,6 @@ func getTag(tag reflect.StructTag) (confTag, bool) {
 	}
 }
 
-func getParser(val *reflect.Value) ConfigParser {
-	switch kind := val.Kind(); kind {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return intParser{}
-	case reflect.String:
-		return stringParser{}
-	case reflect.Float32, reflect.Float64:
-		return floatParser{}
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return uintParser{}
-	case reflect.Bool:
-		return boolParser{}
-	default:
-		return stringParser{}
-	}
-}
-
-type intParser struct{}
-
 func getValue(typ *reflect.StructField) (string, error) {
 	var envName string
 
@@ -81,83 +62,54 @@ func getValue(typ *reflect.StructField) (string, error) {
 	}
 }
 
-func (p intParser) parse(val *reflect.Value, typ *reflect.StructField) error {
-	value, err := getValue(typ)
-	if err != nil {
-		return err
-	}
+func parseValue(value string, typ *reflect.StructField) (reflect.Value, error) {
+	switch typ.Type.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		intVal, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return reflect.Value{}, fmt.Errorf(typeMismatchError, typ.Name, err)
+		}
 
-	typedVal, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		return fmt.Errorf(typeMismatchError, typ.Name, err)
-	} else {
-		val.SetInt(typedVal)
-	}
+		return reflect.ValueOf(intVal).Convert(reflect.TypeOf(int(0))), nil
+	case reflect.String:
+		return reflect.ValueOf(value).Convert(reflect.TypeOf("")), nil
+	case reflect.Float32, reflect.Float64:
+		floatVal, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return reflect.Value{}, fmt.Errorf(typeMismatchError, typ.Name, err)
+		}
 
-	return nil
+		return reflect.ValueOf(floatVal).Convert(reflect.TypeOf(float64(0))), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		uintVal, err := strconv.ParseUint(value, 10, 64)
+		if err != nil {
+			return reflect.Value{}, fmt.Errorf(typeMismatchError, typ.Name, err)
+		}
+
+		return reflect.ValueOf(uintVal).Convert(reflect.TypeOf(uint(0))), nil
+	case reflect.Bool:
+		boolVal, err := strconv.ParseBool(value)
+		if err != nil {
+			return reflect.Value{}, fmt.Errorf(typeMismatchError, typ.Name, err)
+		}
+
+		return reflect.ValueOf(boolVal).Convert(reflect.TypeOf(true)), nil
+	default:
+		return reflect.Value{}, fmt.Errorf("unsupported type")
+	}
 }
 
-type stringParser struct{}
-
-func (p stringParser) parse(val *reflect.Value, typ *reflect.StructField) error {
+func parseField(val *reflect.Value, typ *reflect.StructField) error {
 	value, err := getValue(typ)
 	if err != nil {
 		return err
 	}
 
-	val.SetString(value)
-
-	return nil
-}
-
-type uintParser struct{}
-
-func (p uintParser) parse(val *reflect.Value, typ *reflect.StructField) error {
-	value, err := getValue(typ)
+	parsedValue, err := parseValue(value, typ)
 	if err != nil {
 		return err
 	}
+	val.Set(parsedValue)
 
-	typedVal, err := strconv.ParseUint(value, 10, 64)
-	if err != nil {
-		return fmt.Errorf(typeMismatchError, typ.Name, err)
-	}
-
-	val.SetUint(typedVal)
-
-	return nil
-}
-
-type floatParser struct{}
-
-func (p floatParser) parse(val *reflect.Value, typ *reflect.StructField) error {
-	value, err := getValue(typ)
-	if err != nil {
-		return err
-	}
-
-	typedVal, err := strconv.ParseFloat(value, 64)
-	if err != nil {
-		return fmt.Errorf(typeMismatchError, typ.Name, err)
-	}
-
-	val.SetFloat(typedVal)
-	return nil
-}
-
-type boolParser struct{}
-
-func (p boolParser) parse(val *reflect.Value, typ *reflect.StructField) error {
-	value, err := getValue(typ)
-	if err != nil {
-		return err
-	}
-
-	typedVal, err := strconv.ParseBool(value)
-	if err != nil {
-		return fmt.Errorf(typeMismatchError, typ.Name, err)
-	}
-
-	val.SetBool(typedVal)
 	return nil
 }
